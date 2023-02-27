@@ -1,118 +1,107 @@
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <cstring>
+#include <sys/socket.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <iostream>
+#include <string.h>
 #include <unistd.h>
-#include <fcntl.h>
-#include <fstream>
 
-const int PORT = 8080;
+#define PORT    5555
+#define BUFLEN  512
 
-void handle_client(int client_socket) {
-    // Чтение запроса от клиента
-    char buffer[1024];
-    int request_size = read(client_socket, buffer, sizeof(buffer));
-    // printf("\n%s", buffer);
-
-    // Проверка ошибок чтения
-    if (request_size < 0) {
-        std::cerr << "Error reading from socket" << std::endl;
-        return;
-    }
-
-    // Парсинг HTTP-запроса
-    std::istringstream request(buffer);
-    std::string method, path, version;
-    request >> method >> path >> version;
-
-    // Проверка правильности метода и версии HTTP-протокола
-    if (method != "GET" || version != "HTTP/1.1") {
-        std::cerr << "Invalid request" << std::endl;
-        return;
-    }
-
-    std::ostringstream response;
-    std::string response_str;
-    // Отправка ответа клиенту
-    if (path == "/") {
-        response << "HTTP/1.1 200 OK\r\n";
-        response << "Content-Type: text/html\r\n";
-        response << "Connection: close\r\n";
-        response << "\r\n";
-        response << "<html><body><h1>Home Page</h1></body></html>";
-    } else {
-        path.erase(path.begin());
-        std::ifstream file(path);
-        if (file.is_open())
-        {
-            // Read file contents
-            std::stringstream file_contents;
-            file_contents << file.rdbuf();
-
-            // Close file
-            file.close();
-
-            // Build response
-            response << file_contents.rdbuf();
-        } else {
-            response << "HTTP/1.1 200 OK\r\n";
-            response << "Content-Type: text/html\r\n";
-            response << "Connection: close\r\n";
-            response << "\r\n";
-            response << "<html><body><h1>Error 404, page not found!</h1></body></html>";
-        }
-    }
-    send(client_socket, response.str().c_str(), response.str().size(), 0);
-    printf("Reply sent\n");
-    // Закрытие сокета
-    close(client_socket);
-}
+int readFromClient(int sock, char* buf);
+void writeToClient(int sock, char *buf);
 
 int main() {
-    // Создание серверного сокета
-    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
+    int sock, new_sock;
+    struct sockaddr_in addr;
+    struct sockaddr_in client;
+    fd_set active_set, read_set;
+    socklen_t size;
+    char buf[BUFLEN];
 
-    // Проверка ошибок создания сокета
-    if (server_socket < 0) {
-        std::cerr << "Error creating socket" << std::endl;
-        return 1;
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PORT);
+    addr.sin_addr.s_addr = htonl(INADDR_ANY);
+
+    sock = socket(PF_INET, SOCK_STREAM, 0);
+    if (sock < 0) {
+        std::cerr << "On server: socket creation failer\n";
+        return -1;
+    }
+    // setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, ) // TODO:
+
+    if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
+        std::cerr << "On server: cannot bind socket\n";
+        return -1;
     }
 
-    // Настройка параметров серверного адреса
-    struct sockaddr_in server_address;
-    server_address.sin_family = AF_INET;
-    server_address.sin_addr.s_addr = INADDR_ANY;
-    server_address.sin_port = htons(PORT);
-
-    // Привязка сокета к адресу
-    int bind_result = bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address));
-    if (bind_result < 0) {
-        std::cerr << "Error binding socket: " << strerror(errno) << std::endl;
-        return 1;
+    if (listen(sock, 5) < 0) {
+        std::cerr << "On server: listen failer\n";
+        return -1;
     }
 
-    // Ожидание подключения клиента
-    listen(server_socket, 5);
+    FD_ZERO(&active_set);
+    FD_SET(sock, &active_set);
 
-    // Обработка клиентских запросов
-    while (true) {
-        struct sockaddr_in client_address;
-        socklen_t client_address_size = sizeof(client_address);
-
-        int client_socket = accept(server_socket, (struct sockaddr*)&client_address, &client_address_size);
-        if (client_socket < 0) {
-            std::cerr << "Error accepting client connection" << std::endl;
-            continue;
+    while (1) {
+        read_set = active_set;
+        if (select(FD_SETSIZE, &read_set, NULL, NULL, NULL) < 0) {
+            std::cerr << "On server: select failer\n";
+            return -1;
         }
 
-        // Обработка запроса от клиента
-        handle_client(client_socket);
+        for (int i = 0; i < FD_SETSIZE; ++i) {
+            if (FD_ISSET(sock, &read_set)) {
+                if (i == sock) { // запрос на новое соединение
+                    size = sizeof(client);
+                    new_sock = accept(sock, (struct sockaddr *)&client, &size);
+                    if (new_sock < 0) {
+                        std::cerr << "On server: accept failer\n";
+                    }
+                    FD_SET(new_sock, &active_set);
+                } else {
+                    int err = readFromClient(i, buf);
+                    if (err < 0) {
+                        close(i);
+                        FD_CLR(i, &active_set);
+                    } else {
+                        writeToClient(i, buf);
+                    }
+                }
+            }
+        }
     }
+}
 
-    // Закрытие серверного сокета
-    close(server_socket);
+int readFromClient(int sock, char* buf) {
+    int nbytes;
 
-    return 0;
+    nbytes = recv(sock, buf, BUFLEN, 0);
+    if (nbytes < 0) {
+        std::cerr << "On server: read failer\n";
+        return -1;
+    } else if (nbytes == 0) {
+        return -1;
+    } else {
+        if (strstr(buf, "stop")) {
+            return -1;
+        }
+        std::cout << "Server got message: " << buf << std::endl;
+        return 0;
+    }
+}
+
+void writeToClient(int sock, char *buf) {
+    int nbytes;
+
+    for (int i = 0; i < strlen(buf) / 2; ++i) {
+        char tmp = buf[i];
+        buf[i] = buf[strlen(buf) - 1];
+        buf[strlen(buf) - 1] = tmp;
+    }
+    nbytes = send(sock, buf, strlen(buf), 0);
+    if (nbytes < 0) {
+        std::cerr << "On server: write failer\n";
+    }
 }
