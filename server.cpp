@@ -1,21 +1,22 @@
 #include <sys/socket.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <netinet/ip.h>
+#include <arpa/inet.h>
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
+#include <map>
 
 #define PORT    5555
 #define BUFLEN  512
 
-int readFromClient(int sock, char* buf);
-void writeToClient(int sock, char *buf);
+int readFromClient(int sock, struct sockaddr_in client_addr, char* buf);
+void writeToClient(int sock, struct sockaddr_in client_addr, char *buf);
 
 int main() {
-    int sock, new_sock;
+    int sock, new_sock, opt = 1;
     struct sockaddr_in addr;
     struct sockaddr_in client;
+    std::map<int, struct sockaddr_in> clients;
     fd_set active_set, read_set;
     socklen_t size;
     char buf[BUFLEN];
@@ -29,7 +30,7 @@ int main() {
         std::cerr << "On server: socket creation failer\n";
         return -1;
     }
-    // setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, ) // TODO:
+    setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
 
     if (bind(sock, (struct sockaddr *)&addr, sizeof(addr)) < 0) {
         std::cerr << "On server: cannot bind socket\n";
@@ -50,23 +51,26 @@ int main() {
             std::cerr << "On server: select failer\n";
             return -1;
         }
-
         for (int i = 0; i < FD_SETSIZE; ++i) {
-            if (FD_ISSET(sock, &read_set)) {
+            if (FD_ISSET(i, &read_set)) {
                 if (i == sock) { // запрос на новое соединение
                     size = sizeof(client);
                     new_sock = accept(sock, (struct sockaddr *)&client, &size);
                     if (new_sock < 0) {
                         std::cerr << "On server: accept failer\n";
                     }
+                    std::cout << "On server: connect from host: " << inet_ntoa(client.sin_addr) << \
+                        " on PORT: " << ntohs(client.sin_port) << std::endl;
+                    clients.insert(std::make_pair(new_sock, client));
                     FD_SET(new_sock, &active_set);
                 } else {
-                    int err = readFromClient(i, buf);
+                    int err = readFromClient(i, clients[i], buf);
                     if (err < 0) {
                         close(i);
                         FD_CLR(i, &active_set);
+                        clients.erase(i);
                     } else {
-                        writeToClient(i, buf);
+                        writeToClient(i, clients[i], buf);
                     }
                 }
             }
@@ -74,34 +78,42 @@ int main() {
     }
 }
 
-int readFromClient(int sock, char* buf) {
+int readFromClient(int sock, struct sockaddr_in client_addr, char* buf) {
     int nbytes;
 
     nbytes = recv(sock, buf, BUFLEN, 0);
     if (nbytes < 0) {
         std::cerr << "On server: read failer\n";
+        std::cout << "On server: disconnect from host: " << inet_ntoa(client_addr.sin_addr) << \
+                        " on PORT: " << ntohs(client_addr.sin_port) << std::endl;
         return -1;
     } else if (nbytes == 0) {
+        std::cout << "On server: disconnect from host: " << inet_ntoa(client_addr.sin_addr) << \
+                        " on PORT: " << ntohs(client_addr.sin_port) << std::endl;
         return -1;
     } else {
         if (strstr(buf, "stop")) {
+            std::cout << "On server: disconnect from host: " << inet_ntoa(client_addr.sin_addr) << \
+                        " on PORT: " << ntohs(client_addr.sin_port) << std::endl;
             return -1;
         }
-        std::cout << "Server got message: " << buf << std::endl;
+        std::cout << "On server: disconnect from host: " << inet_ntoa(client_addr.sin_addr) << \
+                        " on PORT: " << ntohs(client_addr.sin_port) << std::endl;
+        std::cout << "From host: " << inet_ntoa(client_addr.sin_addr) << \
+                        " on PORT: " << ntohs(client_addr.sin_port) << " server got message : " << (const char*)buf << std::endl;
         return 0;
     }
 }
 
-void writeToClient(int sock, char *buf) {
+void writeToClient(int sock, struct sockaddr_in client_addr, char *buf) {
     int nbytes;
 
-    for (int i = 0; i < strlen(buf) / 2; ++i) {
-        char tmp = buf[i];
-        buf[i] = buf[strlen(buf) - 1];
-        buf[strlen(buf) - 1] = tmp;
+    for (int i = 0; i < strlen(buf); ++i) {
+        buf[i] = toupper(buf[i]);
     }
-    nbytes = send(sock, buf, strlen(buf), 0);
+    nbytes = send(sock, buf, strlen(buf) + 1, 0);
     if (nbytes < 0) {
-        std::cerr << "On server: write failer\n";
+        std::cerr << "On server: write failer to client from host: " << inet_ntoa(client_addr.sin_addr) << \
+                        " on PORT: " << ntohs(client_addr.sin_port) << std::endl;
     }
 }

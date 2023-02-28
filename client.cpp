@@ -1,10 +1,9 @@
 #include <sys/socket.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
-#include <netinet/ip.h>
 #include <iostream>
 #include <string.h>
 #include <unistd.h>
+#include <string>
 
 #define PORT    5555
 #define BUFLEN  512
@@ -56,8 +55,9 @@ int readFromServer(int sock) {
         return -1;
     } else if (nbytes == 0) {
         std::cout << "No message from server\n";
+        return -1;
     } else {
-        std::cout << "Message from server: " << message << std::endl;
+        std::cout << "Message from server: " << (const char*)message << std::endl;
     }
     return 0;
 }
@@ -69,7 +69,7 @@ int writeToServer(int sock) {
     std::cout << "Message to server: ";
     std::cin >> message;
 
-    nbytes = send(sock, message.c_str(), message.length(), 0);
+    nbytes = send(sock, message.c_str(), message.length() + 1, 0);
     if (nbytes < 0) {
         std::cerr << "On client: write failer\n";
         return -1;
