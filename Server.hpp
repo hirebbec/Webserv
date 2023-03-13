@@ -7,17 +7,11 @@
 #include <iostream>
 
 
-struct Server {
+struct Server: Location {
 public:	
+	Configuration					_conf;
 	std::string						_port;
 	std::vector<std::string>		_server_name;
-    limit_except_type				_limit_except;
-    std::pair<bool, return_type>	_return;
-	std::map<int, std::string>		_error_pages;
-	std::string						_root;
-	std::string						_index;
-	bool							_autoindex;
-	size_t							_client_max_boby_size;
 	std::map<std::string, Location>	_locations;
 
 private:
