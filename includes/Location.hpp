@@ -8,15 +8,37 @@ struct return_type {
 	std::string	location;
 
 	return_type(): code(0), location("") {};
+
+	std::string	getReturnPath() {
+		std::string header("Location: ");
+		return header + location;
+	}
 };
 
 struct limit_except_type {
+	typedef std::map<std::string, bool>::iterator	iterator;
+
 	std::map<std::string, bool> methods;
 
 	limit_except_type() {
 		methods.insert(std::make_pair("GET", true));
 		methods.insert(std::make_pair("POST", true));
 		methods.insert(std::make_pair("DELETE", true));
+	}
+
+	std::string	getAllowMethods() {
+		std::string allowed("Allow: ");
+		for (iterator it = methods.begin(); it != methods.end(); ++it) {
+			if ((*it).second) {
+				allowed.append((*it).first);
+				allowed.append(", ");
+			}
+		}
+		if (allowed.length() > 0) {
+			allowed.erase(allowed.end());
+			allowed.erase(allowed.end());
+		}
+		return allowed;
 	}
 };
 
@@ -32,7 +54,7 @@ struct Configuration
 
 	Configuration(): _return(std::pair<bool, return_type>(false, return_type())), \
 	_autoindex(false), _root(""), _index(std::pair<bool, std::string>(false, "")), \
-	_client_max_boby_size(0) {};
+	_client_max_boby_size(4096) {};
 };
 
 

@@ -5,6 +5,7 @@
 #include <netdb.h>
 #include <cstdlib>
 #include <iostream>
+#include <fcntl.h>
 
 
 struct Server: Location {
@@ -34,17 +35,29 @@ private:
 		}
 		_addr.sin_family = AF_INET;
 		_addr.sin_port = htons(std::atoi(_port.c_str()));
-		_addr.sin_addr = ((struct sockaddr_in *) res->ai_addr)->sin_addr;
+		for (struct addrinfo* p = res; p != NULL; p = p->ai_next) {
+			if (p->ai_family == AF_INET) {
+				struct sockaddr_in* ipv4 = (struct sockaddr_in*)p->ai_addr;
+				_addr.sin_addr = ipv4->sin_addr;
+				break;
+			}
+		}
+		// _addr.sin_addr = ((struct sockaddr_in *) res->ai_addr)->sin_addr;
+		_addr.sin_addr.s_addr = INADDR_ANY;
 		freeaddrinfo(res);
 		return true;
 	}
 
 	bool create_socket() {
-		_sock = socket(AF_INET, SOCK_STREAM, 0);
+		int opt = 1;
+
+		_sock = socket(PF_INET, SOCK_STREAM, 0);
 		if (_sock < 0) {
 			std::cerr << "Socket creating error on server: " << _server_name[0] << std::endl;
 			return false;
 		}
+		fcntl(_sock, F_SETFL, O_NONBLOCK);
+		setsockopt(_sock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
 		return true;
 	}
 
@@ -67,7 +80,7 @@ private:
 public:
 	bool init() {
 		if (this->init_sockaddr() && this->create_socket() && \
-			this->binding() && 	this->listening())
+			this->binding() && this->listening())
 			return true;
 		return false;
 	}
@@ -78,6 +91,6 @@ public:
 
 	Server() {
 		_server_name.push_back("localhost");
-		_port = "132";
+		_port = "4040";
 	};
 };

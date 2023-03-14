@@ -51,7 +51,7 @@ public:
                 return false;
             }
 
-            body = request.substr(pos, content_length);
+            body = request.substr(pos + 2, content_length + 2);
         }
 
         return true;

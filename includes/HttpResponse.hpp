@@ -6,25 +6,24 @@ class HttpResponse {
 public:
     HttpResponse() {}
 
-    std::string generateResponse(int statusCode = 200, std::string contentType = "text/plain", std::string content = "") {
+    std::string generateResponse(int statusCode, std::vector<std::string> headers, std::string path) {
         std::ostringstream oss;
         oss << "HTTP/1.1 " << statusCode << " " << getStatusMessage(statusCode) << "\r\n";
-        oss << "Content-Type: " << contentType << "\r\n";
-        oss << "Content-Length: " << content.length() << "\r\n";
-        oss << "\r\n";
-        oss << content;
-        return oss.str();
-    }
-
-    std::string generateResponse(std::string path) {
-        std::ifstream file(path);
+        for (std::vector<std::string>::iterator it = headers.begin(); it != headers.end(); ++it) {
+            oss << (*it) << "\r\n";
+        }
+        std::ifstream file(path.c_str());
         if (file.is_open()) {
             std::string content((std::istreambuf_iterator<char>(file)),
                                 (std::istreambuf_iterator<char>()));
+            if (content.length() > 0) {
+                oss << "Content-Type: " << "text/html" << "\r\n";
+                oss << "Content-Length: " << content.length() << "\r\n\r\n";
+                oss << content << "\r\n";
+            }
             file.close();
-            return content;
         }
-        return "HTTP/1.1 404 Not Found\n\rContent-Type: text/html\n\rContent-Length: 149\n\r\n\r<html>\n\r<head><title>404 Not Found</title></head>\n\r<body>\n\r<h1>404 Not Found</h1>\n\r<p>The requested URL was not found on this server.</p>\n\r</body>\n\r</html>";
+        return oss.str();
     }
 
 private:
@@ -32,6 +31,8 @@ private:
         switch (statusCode) {
             case 200:
                 return "OK";
+            case 204:
+                return "No Content";
             case 302:
                 return "Found";
             case 400:
