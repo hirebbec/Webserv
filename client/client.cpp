@@ -40,7 +40,7 @@ int main() {
   }
 
   // Отправляем запрос
-  std::string request = "GET cgi-bin/time HTTP/1.1\r\n";
+  std::string request = "DELETE /uploads/lol HTTP/1.1\r\n";
   send(sockfd, request.c_str(), request.size(), 0);
 
   // Читаем ответ

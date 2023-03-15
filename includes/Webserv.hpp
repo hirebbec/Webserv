@@ -87,15 +87,19 @@ private:
 		int bytes = recv(sock, buf, BUFFER_SIZE, 0);
 		if (bytes < 0) {
 			std::cerr << "Recv error\n";
+			close(sock);
+			FD_CLR(sock, &_active_set);
 			return false;
 		} else if (bytes == 0) {
-			std::string response = httpResponse.generateResponse(204, std::vector<std::string>(), "204");
-			send(sock, response.c_str(), response.length(), 0); // No content
+			std::string response = httpResponse.generateResponse(204, std::vector<std::string>(), "/error_page/204.html");
+			send(sock, response.c_str(), response.length(), 0); // No content (can't check :( )
+			close(sock);
+			FD_CLR(sock, &_active_set);
 			return false;
 		}
 		if (!httpParser.parse(buf, bytes)) {
-			std::string response = httpResponse.generateResponse(400, std::vector<std::string>(), "400");
-			send(sock, response.c_str(), response.length(), 0); // Bad request
+			std::string response = httpResponse.generateResponse(400, std::vector<std::string>(), "/error_page/400.html");
+			send(sock, response.c_str(), response.length(), 0); // Bad request (Checked)
 			return false;	
 		}
 		return true;
@@ -109,41 +113,35 @@ private:
 		Server server = choseServer(sock);
 		Configuration conf = choseConf(server);
 		if (conf._limit_except.methods.find(httpParser.method) == conf._limit_except.methods.end() ||
-		conf._limit_except.methods[httpParser.method] == false) { // case 2.1
+		conf._limit_except.methods[httpParser.method] == false) { // case 2.1(Checked)
 			code = 405; //Method Not Allowed
 			headers.push_back(conf._limit_except.getAllowMethods()); // Allow header
-		} else if (conf._return.first) { //case 2.2
+		} else if (conf._return.first) { //case 2.2 (Checked)
 			code = 302; // Found
 			headers.push_back(conf._return.second.getReturnPath()); // Location header
 		} else if (httpParser.method == "GET") { // case 2.3
 			if (httpParser.uri[httpParser.uri.length() - 1] == '/') { // case 2.3.1
-				if (conf._index.first) { // case 2.3.1.1
-					if (exist(conf._root + conf._index.second)) {
-						code = 200; // successful response
-						path = conf._root + conf._index.second; // Index file path
-					} else {
-						code = 404; // Not Found
-					}
-				} else { // case 2.3.1.2
-					if (conf._autoindex) {
-						generate_autoindex(conf._root + httpParser.uri, sock); // autoindex
-						return;
-					} else {
-						code = 404; // Not Found
-					}
+				if (exist(conf._root + httpParser.uri + conf._index.second)) { // case 2.3.1.1 (Checked)
+					std::string response = httpResponse.generateResponse(200, headers, conf._root + httpParser.uri + conf._index.second);
+					send(sock, response.c_str(), response.length(), 0);
+					return;
+				} else if (conf._autoindex) { // case 2.3.1.2 (Checked)
+					generate_autoindex("." + conf._root + httpParser.uri, sock); // autoindex
+					return;
+				} else { // case 2.3.1.3 (Checked)
+					code = 404; // Not Found
 				}
-			} else if (httpParser.uri.length() > 8 && httpParser.uri.substr(0, 8) == "cgi-bin/") { // case 2.3.2
-				// TODO cgi-script
-				if (exist(conf._root + httpParser.uri)){
-					executeCGI(conf._root + httpParser.uri, sock);
+			} else if (httpParser.uri.length() > 9 && httpParser.uri.substr(0, 9) == "/cgi-bin/") { // case 2.3.2 (Checked)
+				if (exist(conf._root + httpParser.uri)) {
+					executeCGI(conf._root + httpParser.uri, sock); //cgi script execution
 					return;
 				} else {
 					code = 404; // Not Found
 				}
 			} else {
-				if (exist(conf._root + httpParser.uri)) {
+				if (exist(conf._root + httpParser.uri)) { // case 2.3.3 (Checked)
 					code = 200; // successful response
-					path = conf._root + httpParser.uri; // File path
+					path = conf._root + httpParser.uri; // File path 
 				} else {
 					code = 404; // Not Found
 				}
@@ -153,21 +151,21 @@ private:
 			httpParser.headers.find("Content-Length") == httpParser.headers.end()) {
 				code = 400; //Bad Request
 			}
-			else if (httpParser.uri[httpParser.uri.length() - 1] == '/') { // case 2.4.1
+			else if (httpParser.uri[httpParser.uri.length() - 1] == '/') { // case 2.4.1 (Checked)
 				code = 405; //Method Not Allowed
 				headers.push_back(conf._limit_except.getAllowMethods()); // Allow header
-			} else if (httpParser.body.length() > conf._client_max_boby_size) {
+			} else if (httpParser.body.length() > conf._client_max_boby_size) { // case 2.4.2 (Checked)
 				code = 413; // Payload Too Large
-			} else {
-				saveContent(); // Saving
-				code = 200; // successful response
+			} else { // case 2.4.3 (Checked)
+				headers.push_back(saveContent()); // Saving
+				code = 201; // successful response
 			}
 		} else { // case 2.5
-			if (httpParser.uri[httpParser.uri.length() - 1] == '/') { // case 2.5.1
+			if (httpParser.uri[httpParser.uri.length() - 1] == '/') { // case 2.5.1 (Checked)
 				code = 405; //Method Not Allowed
 				headers.push_back(conf._limit_except.getAllowMethods()); // Allow header
-			} else { // case 2.5.2
-				std::string path = conf._root + httpParser.uri;
+			} else { // case 2.5.2 (Checked)
+				std::string path = "." + conf._root + httpParser.uri;
 				if (std::remove((const char*)path.c_str()) != 0) {
 					code = 404; // Not Found
 				} else {
@@ -176,7 +174,9 @@ private:
 			}
 		}
 		path = getPath(code, conf);
+		std::cout << path << std::endl;
 		std::string response = httpResponse.generateResponse(code, headers, path);
+		std::cout << response;
 		send(sock, response.c_str(), response.length(), 0);
 	}
 
@@ -192,10 +192,16 @@ private:
 	Configuration choseConf(Server &server) {
 		Configuration conf = server._conf;
 		std::string uri = httpParser.uri;
+
 		while (uri.length() > 0) {
 			if (server._locations.find(uri) != server._locations.end()) {
 				return server._locations[uri]._conf;
 			}
+			if (uri.length() == 1) {
+				return conf;
+			} else if (uri[uri.length() - 1] == '/') {
+				uri.erase(0, uri.length() - 2);
+			} 
 			for (int i = uri.length() - 1; i > 0; ++i) {
 				if (uri[i] == '/') {
 					uri.erase(0, i);
@@ -207,6 +213,7 @@ private:
 	}
 
 	bool exist(std::string path) {
+		path = "." + path;
 		std::ifstream file(path.c_str());
 		bool ans = file.good();
 		file.close();
@@ -214,13 +221,16 @@ private:
 	}
 
 	std::string	getPath(int code, const Configuration &conf) {
+		if (code / 100 == 2) {
+			return conf._root + httpParser.uri;
+		} 
 		if (conf._error_pages.find(code) != conf._error_pages.end()) {
 			return (*conf._error_pages.find(code)).second;
 		} else {
 			std::stringstream ss;
 			ss << code;
-			std::string path("error_pages/");
-			return path + ss.str();
+			std::string path("/error_pages/");
+			return path + ss.str() + ".html";
 		}
 	}
 
@@ -278,18 +288,21 @@ private:
 		send(sock, response.c_str(), response.length(), 0);
 	}
 
-	void saveContent() {
+	std::string saveContent() {
 		time_t now = time(NULL);
 		struct tm *t = localtime(&now);
 		char buf[80];
-		std::strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", t);
+		std::strftime(buf, sizeof(buf), "%Y-%m-%d_%H:%M:%S", t);
 		std::stringstream ss;
 		ss << buf;
 		std::string time_str = ss.str();
 		std::ofstream fout;
-		fout.open(("uploads/" + time_str).c_str());
+		std::string path = "uploads/" + time_str;
+		fout.open(path.c_str());
 		fout << httpParser.body;
 		fout.close();
+		std::cout << httpParser.body;
+		return "Location: " + path;
 	}
 
 	std::string intToStr(int num) {
@@ -299,6 +312,7 @@ private:
 	}
 
 	void	executeCGI(std::string path, int sock) {
+		path = "." + path;
 		int pid = fork();
 		if (pid == 0) {
 			dup2(sock, STDOUT_FILENO);
@@ -306,4 +320,6 @@ private:
 		}
 		wait(NULL);
 	}
+
+	
 };

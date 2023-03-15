@@ -8,6 +8,11 @@ public:
 
     std::string generateResponse(int statusCode, std::vector<std::string> headers, std::string path) {
         std::ostringstream oss;
+
+        if (statusCode / 100 == 4) {
+            headers.push_back("Connection: close");
+        }
+        path = "." + path;
         oss << "HTTP/1.1 " << statusCode << " " << getStatusMessage(statusCode) << "\r\n";
         for (std::vector<std::string>::iterator it = headers.begin(); it != headers.end(); ++it) {
             oss << (*it) << "\r\n";
@@ -17,7 +22,7 @@ public:
             std::string content((std::istreambuf_iterator<char>(file)),
                                 (std::istreambuf_iterator<char>()));
             if (content.length() > 0) {
-                oss << "Content-Type: " << "text/html" << "\r\n";
+                oss << "Content-Type: " << "text/html; charset=utf-8" << "\r\n";
                 oss << "Content-Length: " << content.length() << "\r\n\r\n";
                 oss << content << "\r\n";
             }
@@ -31,6 +36,8 @@ private:
         switch (statusCode) {
             case 200:
                 return "OK";
+            case 201:
+                return "Created";
             case 204:
                 return "No Content";
             case 302:

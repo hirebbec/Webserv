@@ -35,8 +35,8 @@ struct limit_except_type {
 			}
 		}
 		if (allowed.length() > 0) {
-			allowed.erase(allowed.end());
-			allowed.erase(allowed.end());
+			allowed.erase(allowed.end() - 1);
+			allowed.erase(allowed.end() - 1);
 		}
 		return allowed;
 	}
@@ -53,7 +53,7 @@ struct Configuration
 	std::map<int, std::string>		_error_pages;
 
 	Configuration(): _return(std::pair<bool, return_type>(false, return_type())), \
-	_autoindex(false), _root(""), _index(std::pair<bool, std::string>(false, "")), \
+	_autoindex(false), _root(""), _index(std::pair<bool, std::string>(true, "index.html")), \
 	_client_max_boby_size(4096) {};
 };
 

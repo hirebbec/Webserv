@@ -21,7 +21,7 @@ private:
 
 	bool init_sockaddr() {
 		struct addrinfo hints, *res;
-		hints.ai_flags = 0;                // никаких флагов
+		hints.ai_flags = AI_PASSIVE;
 		hints.ai_family = AF_UNSPEC;       // IPv4 или IPv6
 		hints.ai_socktype = SOCK_STREAM;   // потоковый сокет
 		hints.ai_protocol = IPPROTO_TCP;   // TCP-протокол
@@ -42,8 +42,8 @@ private:
 				break;
 			}
 		}
-		// _addr.sin_addr = ((struct sockaddr_in *) res->ai_addr)->sin_addr;
-		_addr.sin_addr.s_addr = INADDR_ANY;
+		_addr.sin_addr = ((struct sockaddr_in *) res->ai_addr)->sin_addr;
+		// _addr.sin_addr.s_addr = INADDR_ANY;
 		freeaddrinfo(res);
 		return true;
 	}
@@ -56,7 +56,7 @@ private:
 			std::cerr << "Socket creating error on server: " << _server_name[0] << std::endl;
 			return false;
 		}
-		fcntl(_sock, F_SETFL, O_NONBLOCK);
+		// fcntl(_sock, F_SETFL, O_NONBLOCK);
 		setsockopt(_sock, SOL_SOCKET, SO_REUSEADDR, (char *)&opt, sizeof(opt));
 		return true;
 	}
