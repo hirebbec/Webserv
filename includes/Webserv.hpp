@@ -121,8 +121,8 @@ private:
 			headers.push_back(conf._return.second.getReturnPath()); // Location header
 		} else if (httpParser.method == "GET") { // case 2.3
 			if (httpParser.uri[httpParser.uri.length() - 1] == '/') { // case 2.3.1
-				if (exist(conf._root + httpParser.uri + conf._index.second)) { // case 2.3.1.1 (Checked)
-					std::string response = httpResponse.generateResponse(200, headers, conf._root + httpParser.uri + conf._index.second);
+				if (exist(conf._root + httpParser.uri + conf._index)) { // case 2.3.1.1 (Checked)
+					std::string response = httpResponse.generateResponse(200, headers, conf._root + httpParser.uri + conf._index);
 					send(sock, response.c_str(), response.length(), 0);
 					return;
 				} else if (conf._autoindex) { // case 2.3.1.2 (Checked)
@@ -157,7 +157,7 @@ private:
 			} else if (httpParser.body.length() > conf._client_max_boby_size) { // case 2.4.2 (Checked)
 				code = 413; // Payload Too Large
 			} else { // case 2.4.3 (Checked)
-				headers.push_back(saveContent()); // Saving
+				headers.push_back(saveContent(conf._root)); // Saving
 				code = 201; // successful response
 			}
 		} else { // case 2.5
@@ -174,9 +174,9 @@ private:
 			}
 		}
 		path = getPath(code, conf);
-		std::cout << path << std::endl;
+		// std::cout << path << std::endl;
 		std::string response = httpResponse.generateResponse(code, headers, path);
-		std::cout << response;
+		// std::cout << response;
 		send(sock, response.c_str(), response.length(), 0);
 	}
 
@@ -197,14 +197,12 @@ private:
 			if (server._locations.find(uri) != server._locations.end()) {
 				return server._locations[uri]._conf;
 			}
-			if (uri.length() == 1) {
-				return conf;
-			} else if (uri[uri.length() - 1] == '/') {
-				uri.erase(0, uri.length() - 2);
-			} 
-			for (int i = uri.length() - 1; i > 0; ++i) {
+			if (uri[uri.length() - 1] == '/') {
+				uri = uri.substr(0, uri.length() - 2);
+			}
+			for (int i = uri.length() - 1; i >= 0; --i) {
 				if (uri[i] == '/') {
-					uri.erase(0, i);
+					uri = uri.substr(0, i + 1);
 					break;
 				}
 			}
@@ -288,7 +286,7 @@ private:
 		send(sock, response.c_str(), response.length(), 0);
 	}
 
-	std::string saveContent() {
+	std::string saveContent(std::string root) {
 		time_t now = time(NULL);
 		struct tm *t = localtime(&now);
 		char buf[80];
@@ -297,12 +295,12 @@ private:
 		ss << buf;
 		std::string time_str = ss.str();
 		std::ofstream fout;
-		std::string path = "uploads/" + time_str;
-		fout.open(path.c_str());
+		time_str = root + time_str;
+		fout.open(time_str.c_str());
 		fout << httpParser.body;
 		fout.close();
 		std::cout << httpParser.body;
-		return "Location: " + path;
+		return "Location: " + time_str;
 	}
 
 	std::string intToStr(int num) {

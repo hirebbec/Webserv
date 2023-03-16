@@ -48,13 +48,12 @@ struct Configuration
     std::pair<bool, return_type>	_return;
 	bool							_autoindex;
 	std::string						_root;
-	std::pair<bool, std::string>	_index;
+	std::string						_index;
 	size_t							_client_max_boby_size;
 	std::map<int, std::string>		_error_pages;
 
 	Configuration(): _return(std::pair<bool, return_type>(false, return_type())), \
-	_autoindex(false), _root(""), _index(std::pair<bool, std::string>(true, "index.html")), \
-	_client_max_boby_size(4096) {};
+	_autoindex(false), _root(""), _index("index.html"),	_client_max_boby_size(4096) {};
 };
 
 
@@ -63,5 +62,5 @@ public:
 	std::string		_uri;
 	Configuration	_conf;
 
-	Location(): _uri(""), _conf(Configuration()) {};
+	Location(std::string uri = "", Configuration conf = Configuration()): _uri(uri), _conf(conf) {};
 };
