@@ -4,7 +4,7 @@ CC			=	c++
 CFLAGS		=	-std=c++98 -Wall -Wextra -Werror
 RM			=	rm -f
 
-SRCS		=	srcs/webserv.cpp
+SRCS		=	developer_files/srcs/webserv.cpp
 OBJS		=	$(SRCS:.cpp=.o)
 
 $(NAME)		:	$(OBJS)

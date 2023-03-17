@@ -12,6 +12,7 @@ public:
 
     bool parse(const char* data, size_t length) {
         std::string request(data, length);
+        clear();
 
         size_t pos1 = request.find(' ');  // ищем первый пробел - разделитель между методом, URI и версией
         size_t pos2 = request.find(' ', pos1+1);
@@ -55,5 +56,13 @@ public:
         }
 
         return true;
+    }
+
+    void clear() {
+        this->body = "";
+        this->headers.clear();
+        this->method = "";
+        this->version = "";
+        this->uri = "";
     }
 };

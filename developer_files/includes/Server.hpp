@@ -89,8 +89,5 @@ public:
 		return _sock;
 	}
 
-	Server() {
-		_server_name.push_back("localhost");
-		_port = "4040";
-	};
+	Server() {};
 };

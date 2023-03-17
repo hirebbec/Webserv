@@ -5,6 +5,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <strings.h>
+#include <fcntl.h>
 
 int main() {
   const char *host = "localhost";
@@ -39,20 +40,22 @@ int main() {
     return 1;
   }
 
-  // Отправляем запрос
+  //Отправляем запрос
   std::string request = "DELETE /uploads/lol HTTP/1.1\r\n";
+  // std::string request = "1231312312";
   send(sockfd, request.c_str(), request.size(), 0);
 
   // Читаем ответ
-  char buffer[1024];
-  int n = 0;
-  while ((n = recv(sockfd, buffer, 1024, 0)) > 0) {
-    std::cout.write(buffer, n);
-  }
+  // char buffer[1024];
+  // recv(sockfd, buffer, 1024, 0);
 
+  // std::cout << (const char*)buffer;
   // Закрываем соединение
-  close(sockfd);
 
+  // recv(sockfd, buffer, 1024, 0);
+  // std::cout << (const char*)buffer;
+  // request = "GET /cgi-bin/time HTTP/1.1\r\n";
+  close(sockfd);
   return 0;
 }
 

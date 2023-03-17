@@ -76,8 +76,8 @@ private:
 			std::cerr << "On server: accept failer\n";
 			return false;
 		}
+		// fcntl(sock, F_SETFL, O_NONBLOCK);
 		_max_sock = _max_sock > new_sock ? _max_sock : new_sock;
-		std::cout << "On server: new connection\n";
 		FD_SET(new_sock, &_active_set);
 		return true;
 	}
@@ -100,8 +100,14 @@ private:
 		if (!httpParser.parse(buf, bytes)) {
 			std::string response = httpResponse.generateResponse(400, std::vector<std::string>(), "/error_page/400.html");
 			send(sock, response.c_str(), response.length(), 0); // Bad request (Checked)
-			return false;	
+			std::cout << httpParser.method << std::endl;
+			std::cout << httpParser.uri << std::endl;
+			std::cout << httpParser.body << std::endl;
+			return false;
 		}
+		std::cout << httpParser.method << std::endl;
+			std::cout << httpParser.uri << std::endl;
+			std::cout << httpParser.body << std::endl;
 		return true;
 	}
 
@@ -109,7 +115,6 @@ private:
 		int code;
 		std::vector<std::string> headers;
 		std::string path;
-
 		Server server = choseServer(sock);
 		Configuration conf = choseConf(server);
 		if (conf._limit_except.methods.find(httpParser.method) == conf._limit_except.methods.end() ||
@@ -233,15 +238,16 @@ private:
 	}
 
 	// Функция для получения времени создания файла в формате временной метки
-	std::string get_file_create_time(const char* filename) {
-		struct stat attrib;
-		if (stat(filename, &attrib) != 0) {
-			return "";
-		}
-		std::stringstream ss;
-		ss << attrib.st_mtime;
-		return ss.str();
-	}
+	std::string get_file_creation_date(const char* file_path) {
+    struct stat attr;
+    if (stat(file_path, &attr) != 0) {
+        return "Unknown";
+    }
+    char date_buff[80];
+    strftime(date_buff, sizeof(date_buff), "%Y-%m-%d %H:%M:%S", localtime(&attr.st_mtime));
+    return std::string(date_buff);
+}
+
 
 	// Функция для получения списка файлов и директорий в заданной директории
 	std::vector<std::string> get_directory_contents(const std::string& directory) {
@@ -272,7 +278,7 @@ private:
 		ss << "<tr><th>Name</th><th>Last Modified</th></tr>";
 		for (std::vector<std::string>::iterator it = contents.begin(); it != contents.end(); ++it) {
 			std::string filename = directory + "/" + *it;
-			std::string create_time = get_file_create_time(filename.c_str());
+			std::string create_time = get_file_creation_date(filename.c_str());
 			ss << "<tr><td><a href=\"" << *it << "\">" << *it << "</a></td><td>" << create_time << "</td></tr>";
 		}
 		ss << "</table></body></html>";
@@ -295,12 +301,11 @@ private:
 		ss << buf;
 		std::string time_str = ss.str();
 		std::ofstream fout;
-		time_str = root + time_str;
-		fout.open(time_str.c_str());
+		std::string path("." + root + "/uploads/" + time_str);
+		fout.open(path.c_str());
 		fout << httpParser.body;
 		fout.close();
-		std::cout << httpParser.body;
-		return "Location: " + time_str;
+		return "Location: " + root + "/uploads/" + time_str;
 	}
 
 	std::string intToStr(int num) {
