@@ -5,7 +5,7 @@ int main() {
     Server server;
 
     server._server_name.push_back("localhost");
-	server._port = "4040";
+	server._port = "4041";
     server._conf._root = "/var/localhost/files";
     server._conf._limit_except.methods["POST"] = false;
     server._conf._limit_except.methods["DELETE"] = false;

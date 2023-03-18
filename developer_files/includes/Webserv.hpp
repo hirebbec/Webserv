@@ -85,6 +85,7 @@ private:
 	bool readRequest(int sock) {
 		char buf[BUFFER_SIZE];
 		int bytes = recv(sock, buf, BUFFER_SIZE, 0);
+		// std::cout << (const char*)buf;
 		if (bytes < 0) {
 			std::cerr << "Recv error\n";
 			close(sock);
@@ -100,14 +101,8 @@ private:
 		if (!httpParser.parse(buf, bytes)) {
 			std::string response = httpResponse.generateResponse(400, std::vector<std::string>(), "/error_page/400.html");
 			send(sock, response.c_str(), response.length(), 0); // Bad request (Checked)
-			std::cout << httpParser.method << std::endl;
-			std::cout << httpParser.uri << std::endl;
-			std::cout << httpParser.body << std::endl;
 			return false;
 		}
-		std::cout << httpParser.method << std::endl;
-			std::cout << httpParser.uri << std::endl;
-			std::cout << httpParser.body << std::endl;
 		return true;
 	}
 
@@ -319,7 +314,17 @@ private:
 		int pid = fork();
 		if (pid == 0) {
 			dup2(sock, STDOUT_FILENO);
-			execve(path.c_str(), NULL, NULL);
+			if (path.substr(path.length() - 3, 3) == ".py") {
+				char** argv = new char*[2];
+				std::cout << "here\n";
+				argv[0] = new char(path.length());
+				argv[0] = (char *)path.c_str();
+				std::cerr << (const char*)argv[0] << std::endl;
+				argv[1] = NULL;
+				execve("/usr/bin/python3", argv, NULL);
+			} else {
+				execve(path.c_str(), NULL, NULL);
+			}
 		}
 		wait(NULL);
 	}

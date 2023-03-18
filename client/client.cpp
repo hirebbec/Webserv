@@ -9,7 +9,7 @@
 
 int main() {
   const char *host = "localhost";
-  int port = 4040;
+  int port = 4041;
 
   // Создаем сокет
   int sockfd = socket(AF_INET, SOCK_STREAM, 0);
