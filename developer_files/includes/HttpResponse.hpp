@@ -27,6 +27,8 @@ public:
                 oss << content << "\r\n";
             }
             file.close();
+        } else {
+            oss << "Content-Length: 0" << "\r\n\r\n";
         }
         return oss.str();
     }

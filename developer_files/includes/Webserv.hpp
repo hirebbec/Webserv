@@ -9,6 +9,8 @@
 #include <dirent.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 
 #define BUFFER_SIZE 4096
@@ -174,9 +176,9 @@ private:
 			}
 		}
 		path = getPath(code, conf);
-		// std::cout << path << std::endl;
+		std::cout << path << std::endl;
 		std::string response = httpResponse.generateResponse(code, headers, path);
-		// std::cout << response;
+		std::cout << response;
 		send(sock, response.c_str(), response.length(), 0);
 	}
 

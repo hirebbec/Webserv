@@ -1,7 +1,7 @@
 NAME		=	webserv
 
 CC			=	c++
-CFLAGS		=	-std=c++98 -Wall -Wextra -Werror
+CFLAGS		=	-std=c++98 #-Wall -Wextra -Werror
 RM			=	rm -f
 
 SRCS		=	developer_files/srcs/webserv.cpp
