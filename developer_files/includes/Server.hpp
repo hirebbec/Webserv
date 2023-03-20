@@ -14,7 +14,7 @@ public:
 	std::string						_port;
 	std::vector<std::string>		_server_name;
 	std::map<std::string, Location>	_locations;
-
+	std::set<int>					_clients;
 private:
 	sockaddr_in _addr;
 	int			_sock;

@@ -26,7 +26,7 @@ response_body = """
 # Формируем HTTP ответ с заголовками
 response = "HTTP/1.1 200 OK\r\n"
 response += "Content-Length: {}\r\n".format(len(response_body))
-response += "Content-Type: text/html\r\n"
+response += "Content-Type: text/html; charset=utf-8 \r\n"
 response += "\r\n"
 response += response_body
 

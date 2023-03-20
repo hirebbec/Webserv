@@ -13,24 +13,24 @@
 #include <sys/wait.h>
 
 
+char** createEnv(const std::vector<std::string>& env, const std::string& uri);
+
 #define BUFFER_SIZE 4096
 
 class Webserv {
 private:
-    std::vector<Server>		_servers;
-    std::set<int>			_listen_socks;
-    fd_set					_active_set;
-    fd_set					_read_set;
-    int						_max_sock;
-	HttpParser				httpParser;
-	HttpResponse			httpResponse;
-
+    std::vector<Server>						_servers;
+    std::set<int>							_listen_socks;
+    fd_set									_active_set;
+    fd_set									_read_set;
+    int										_max_sock;
+	HttpParser								httpParser;
+	HttpResponse							httpResponse;
+	std::vector<std::string>				_env;
+	std::vector<std::string>				_paths;
 public:
-	Webserv(std::vector<Server> &servers): _servers(servers), _max_sock(0) {
-		FD_ZERO(&_active_set);
-	};
 
-	Webserv(): _max_sock(0) {
+	Webserv(std::vector<std::string> env, std::vector<std::string> paths): _max_sock(0), _env(env), _paths(paths) {
 		FD_ZERO(&_active_set);
 	};
 
@@ -44,10 +44,11 @@ public:
 				_max_sock = _max_sock > (*it).getSock() ? _max_sock : (*it).getSock();
 				_listen_socks.insert((*it).getSock());
         		FD_SET((*it).getSock(), &_active_set);
-				return true;
+			} else {
+				continue;
 			}
 		}
-		return false;
+		return true;
 	}
 
 	bool startMonitoring() {
@@ -64,6 +65,8 @@ public:
 					} else {
 						if (readRequest(sock))
 							sendAnswer(sock);
+						else
+							delete_client(sock);
 					}
 				}
 			}
@@ -79,9 +82,21 @@ private:
 			return false;
 		}
 		// fcntl(sock, F_SETFL, O_NONBLOCK);
+		for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
+			if ((*it).getSock() == sock) {
+				(*it)._clients.insert(new_sock);
+				break;
+			}
+		}
 		_max_sock = _max_sock > new_sock ? _max_sock : new_sock;
 		FD_SET(new_sock, &_active_set);
 		return true;
+	}
+
+	void delete_client(int sock) {
+		for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
+			(*it)._clients.erase(sock);
+		}
 	}
 
 	bool readRequest(int sock) {
@@ -134,8 +149,8 @@ private:
 					code = 404; // Not Found
 				}
 			} else if (httpParser.uri.length() > 9 && httpParser.uri.substr(0, 9) == "/cgi-bin/") { // case 2.3.2 (Checked)
-				if (exist(conf._root + httpParser.uri)) {
-					executeCGI(conf._root + httpParser.uri, sock); //cgi script execution
+				if (exist(conf._root + httpParser.uri)) { //TODO
+					executeScript(conf._root + httpParser.uri, sock);
 					return;
 				} else {
 					code = 404; // Not Found
@@ -176,18 +191,21 @@ private:
 			}
 		}
 		path = getPath(code, conf);
-		std::cout << path << std::endl;
+		// std::cout << path << std::endl;
 		std::string response = httpResponse.generateResponse(code, headers, path);
-		std::cout << response;
+		// std::cout << response;
 		send(sock, response.c_str(), response.length(), 0);
 	}
 
 	Server &choseServer(int sock) {
+		// std::cout << "sock = " << sock << std::endl;
 		for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
-			if ((*it).getSock() == sock) {
+			if ((*it)._clients.find(sock) != (*it)._clients.end()) {
 				return *it;
 			}
+			// std::cout << "serv sock = " << (*it).getSock() << std::endl;
 		}
+		// std::cout << "lol\n";
 		return _servers[0];
 	}
 
@@ -311,19 +329,24 @@ private:
 		return ss.str();
 	}
 
-	void	executeCGI(std::string path, int sock) {
+	void	executeScript(std::string path, int sock) {
 		path = "." + path;
 		int pid = fork();
 		if (pid == 0) {
 			dup2(sock, STDOUT_FILENO);
 			if (path.substr(path.length() - 3, 3) == ".py") {
-				char** argv = new char*[2];
-				std::cout << "here\n";
-				argv[0] = new char(path.length());
-				argv[0] = (char *)path.c_str();
-				std::cerr << (const char*)argv[0] << std::endl;
-				argv[1] = NULL;
-				execve("/usr/bin/python3", argv, NULL);
+				std::string python_path;
+				std::vector<std::string>::iterator it;
+				for (it = _paths.begin(); it != _paths.end(); ++it) {
+					if (!access(((*it) + "/python3").c_str(), X_OK)) {
+						python_path = (*it) + "/python3";
+						break;
+					}
+				}
+				if (it != _paths.end()) {
+					char* argv[] = {const_cast<char*>(python_path.c_str()), const_cast<char*>(path.c_str()), NULL};
+					execve(((*it) + "/python3").c_str(), argv, createEnv(_env, httpParser.uri));
+				}
 			} else {
 				execve(path.c_str(), NULL, NULL);
 			}

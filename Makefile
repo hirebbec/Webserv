@@ -1,10 +1,10 @@
 NAME		=	webserv
 
 CC			=	c++
-CFLAGS		=	-std=c++98 #-Wall -Wextra -Werror
+CFLAGS		=	-std=c++98 -Wall -Wextra -Werror
 RM			=	rm -f
 
-SRCS		=	developer_files/srcs/webserv.cpp
+SRCS		=	developer_files/srcs/main.cpp developer_files/srcs/utils.cpp
 OBJS		=	$(SRCS:.cpp=.o)
 
 $(NAME)		:	$(OBJS)
