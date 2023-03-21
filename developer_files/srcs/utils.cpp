@@ -1,4 +1,5 @@
 #include "./../includes/headers.hpp"
+#include <cstring>
 
 std::vector<std::string> getPathFromEnv(char **envp) {
     std::vector<std::string> pathVec;
@@ -30,46 +31,37 @@ std::vector<std::string> envpToVector(char** envp) {
     return envVector;
 }
 
-char** createEnv(const std::vector<std::string>& env, const std::string& uri) {
-    // Count the number of environment variables in env
-    int envCount = env.size();
-    
-    // Parse the URI to extract any environment variables it contains
-    std::string envString = uri.substr(uri.find("?") + 1);
-    std::vector<std::string> uriEnv;
-    size_t pos = 0;
-    while ((pos = envString.find("&")) != std::string::npos) {
-        std::string token = envString.substr(0, pos);
-        uriEnv.push_back(token);
-        envString.erase(0, pos + 1);
+void parseURI(std::vector<std::string>& envp, std::string& uri) {
+    std::string::size_type pos = uri.find('?');
+    if (pos != std::string::npos) {
+        std::string query_string = uri.substr(pos + 1);
+        for (std::vector<std::string>::iterator it = envp.begin(); it != envp.end(); ++it) {
+            if ((*it).compare(0, 13, "QUERY_STRING=") == 0){
+                (*it) = "QUERY_STRING=" + query_string;
+                uri.erase(pos);
+                return;
+            }
+        }
+        envp.push_back("QUERY_STRING=" + query_string);
+        uri.erase(pos);
     }
-    uriEnv.push_back(envString);
-
-    // Count the number of environment variables in uriEnv
-    int uriEnvCount = uriEnv.size();
-
-    // Allocate memory for the new environment variable array
-    char** newEnv = new char*[envCount + uriEnvCount + 1];
-    int i = 0;
-
-    // Copy the environment variables from env to newEnv
-    for (i = 0; i < envCount; i++) {
-        const char* envStr = env[i].c_str();
-        int envLen = strlen(envStr) + 1;
-        newEnv[i] = new char[envLen];
-        strncpy(newEnv[i], envStr, envLen);
-    }
-
-    // Copy the environment variables from uriEnv to newEnv
-    for (int j = 0; j < uriEnvCount; j++) {
-        const char* envStr = uriEnv[j].c_str();
-        int envLen = strlen(envStr) + 1;
-        newEnv[i + j] = new char[envLen];
-        strncpy(newEnv[i + j], envStr, envLen);
-    }
-
-    // Set the last element of the newEnv array to NULL
-    newEnv[envCount + uriEnvCount] = NULL;
-
-    return newEnv;
 }
+
+
+// Функция, которая принимает вектор строк и возвращает массив указателей на символы
+char** vectorToCharArray(std::vector<std::string>& vec)
+{
+    // Создаем массив указателей на символы размером vec.size()
+    char** charArray = new char*[vec.size() + 1];
+
+    // Проходимся по каждой строке вектора и добавляем ее в массив указателей на символы
+    for (int i = 0; i < vec.size(); i++) {
+        charArray[i] = &vec[i][0];
+    }
+
+    charArray[vec.size()] = NULL;
+
+    return charArray;
+}
+
+

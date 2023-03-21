@@ -11,9 +11,11 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <fstream>
 
 
-char** createEnv(const std::vector<std::string>& env, const std::string& uri);
+void parseURI(std::vector<std::string>& envp, std::string& uri);
+char** vectorToCharArray(std::vector<std::string>& vec);
 
 #define BUFFER_SIZE 4096
 
@@ -100,28 +102,30 @@ private:
 	}
 
 	bool readRequest(int sock) {
-		char buf[BUFFER_SIZE];
-		int bytes = recv(sock, buf, BUFFER_SIZE, 0);
-		// std::cout << (const char*)buf;
-		if (bytes < 0) {
-			std::cerr << "Recv error\n";
-			close(sock);
-			FD_CLR(sock, &_active_set);
-			return false;
-		} else if (bytes == 0) {
+		char buffer[BUFFER_SIZE];
+		int bytes = recv(sock, buffer, BUFFER_SIZE, 0);
+
+		if (bytes == 0) {
 			std::string response = httpResponse.generateResponse(204, std::vector<std::string>(), "/error_page/204.html");
 			send(sock, response.c_str(), response.length(), 0); // No content (can't check :( )
 			close(sock);
 			FD_CLR(sock, &_active_set);
 			return false;
 		}
-		if (!httpParser.parse(buf, bytes)) {
+		if (bytes < 0) {
+			std::cerr << "Recv error\n";
+			close(sock);
+			FD_CLR(sock, &_active_set);
+			return false;
+		}
+		if (!httpParser.parse(buffer, bytes)) {
 			std::string response = httpResponse.generateResponse(400, std::vector<std::string>(), "/error_page/400.html");
 			send(sock, response.c_str(), response.length(), 0); // Bad request (Checked)
 			return false;
 		}
 		return true;
 	}
+
 
 	void sendAnswer(int sock) {
 		int code;
@@ -144,13 +148,15 @@ private:
 					return;
 				} else if (conf._autoindex) { // case 2.3.1.2 (Checked)
 					generate_autoindex("." + conf._root + httpParser.uri, sock); // autoindex
-					return;
+					return;g
 				} else { // case 2.3.1.3 (Checked)
 					code = 404; // Not Found
 				}
 			} else if (httpParser.uri.length() > 9 && httpParser.uri.substr(0, 9) == "/cgi-bin/") { // case 2.3.2 (Checked)
-				if (exist(conf._root + httpParser.uri)) { //TODO
-					executeScript(conf._root + httpParser.uri, sock);
+				std::string uri = conf._root + httpParser.uri;
+				parseURI(_env, uri);
+				if (exist(uri)) { //TODO
+					executeScript(uri, sock);
 					return;
 				} else {
 					code = 404; // Not Found
@@ -191,9 +197,7 @@ private:
 			}
 		}
 		path = getPath(code, conf);
-		// std::cout << path << std::endl;
 		std::string response = httpResponse.generateResponse(code, headers, path);
-		// std::cout << response;
 		send(sock, response.c_str(), response.length(), 0);
 	}
 
@@ -329,8 +333,8 @@ private:
 		return ss.str();
 	}
 
-	void	executeScript(std::string path, int sock) {
-		path = "." + path;
+	void executeScript(const std::string& uri, int sock) {
+		std::string path = "." + uri;
 		int pid = fork();
 		if (pid == 0) {
 			dup2(sock, STDOUT_FILENO);
@@ -338,14 +342,19 @@ private:
 				std::string python_path;
 				std::vector<std::string>::iterator it;
 				for (it = _paths.begin(); it != _paths.end(); ++it) {
-					if (!access(((*it) + "/python3").c_str(), X_OK)) {
+					std::ifstream python_file((*it) + "/python3");
+					if (python_file.good()) {
 						python_path = (*it) + "/python3";
 						break;
 					}
 				}
 				if (it != _paths.end()) {
-					char* argv[] = {const_cast<char*>(python_path.c_str()), const_cast<char*>(path.c_str()), NULL};
-					execve(((*it) + "/python3").c_str(), argv, createEnv(_env, httpParser.uri));
+					char* argv[] = {
+						const_cast<char*>(python_path.c_str()),
+						const_cast<char*>(uri.c_str()),
+						NULL
+					};
+					execve(python_path.c_str(), argv, vectorToCharArray(_env));
 				}
 			} else {
 				execve(path.c_str(), NULL, NULL);
@@ -353,6 +362,7 @@ private:
 		}
 		wait(NULL);
 	}
+
 
 	
 };

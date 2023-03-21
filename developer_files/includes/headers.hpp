@@ -2,4 +2,5 @@
 
 std::vector<std::string> getPathFromEnv(char **envp);
 std::vector<std::string> envpToVector(char** envp);
-char** createEnv(const std::vector<std::string>& env, const std::string& uri);
+void parseURI(std::vector<std::string>& envp, std::string& uri);
+char** vectorToCharArray(std::vector<std::string>& vec);

@@ -1,6 +1,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <vector>
 
 class HttpResponse {
 public:
