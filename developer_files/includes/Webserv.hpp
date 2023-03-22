@@ -82,7 +82,6 @@ private:
 			std::cerr << "On server: accept failer\n";
 			return false;
 		}
-		// fcntl(sock, F_SETFL, O_NONBLOCK);
 		for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
 			if ((*it).getSock() == sock) {
 				(*it)._clients.insert(new_sock);
@@ -102,35 +101,37 @@ private:
 
 	bool readRequest(int sock) {
 		char buf[BUFFER_SIZE];
+
 		int bytes = recv(sock, buf, BUFFER_SIZE, 0);
-		// std::cout << (const char*)buf;
+
 		if (bytes < 0) {
-			std::cerr << "Recv error\n";
+			std::cerr << "Error: Failed to receive data.\n";
 			close(sock);
 			FD_CLR(sock, &_active_set);
 			return false;
-		} else if (bytes == 0) {
+		} 
+		else if (bytes == 0) {
 			std::string response = httpResponse.generateResponse(204, std::vector<std::string>(), "/error_page/204.html");
 			if (send(sock, response.c_str(), response.length(), 0) <= 0) {
 				delete_client(sock);
-				FD_CLR(sock, &_active_set);
-				close(sock);
-			} // No content (can't check :( )
+			} 
 			close(sock);
 			FD_CLR(sock, &_active_set);
 			return false;
 		}
+
 		if (!httpParser.parse(buf, bytes)) {
 			std::string response = httpResponse.generateResponse(400, std::vector<std::string>(), "/error_page/400.html");
 			if (send(sock, response.c_str(), response.length(), 0) <= 0) {
 				delete_client(sock);
 				FD_CLR(sock, &_active_set);
 				close(sock);
-			} // Bad request (Checked)
+			} 
 			return false;
 		}
 		return true;
 	}
+
 
 	void sendAnswer(int sock) {
 		int code;
@@ -164,7 +165,7 @@ private:
 			} else if (httpParser.uri.length() > 9 && httpParser.uri.substr(0, 9) == "/cgi-bin/") { // case 2.3.2 (Checked)
 				std::string uri = conf._root + httpParser.uri;
 				parseURI(_env, uri);
-				if (exist(uri)) { //TODO
+				if (exist(uri)) {
 					executeScript(uri, sock);
 					return;
 				} else {
@@ -206,9 +207,7 @@ private:
 			}
 		}
 		path = getPath(code, conf);
-		// std::cout << path << std::endl;
 		std::string response = httpResponse.generateResponse(code, headers, path);
-		// std::cout << response;
 		if (send(sock, response.c_str(), response.length(), 0) <= 0) {
 			delete_client(sock);
 			FD_CLR(sock, &_active_set);
@@ -217,14 +216,11 @@ private:
 	}
 
 	Server &choseServer(int sock) {
-		// std::cout << "sock = " << sock << std::endl;
 		for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
 			if ((*it)._clients.find(sock) != (*it)._clients.end()) {
 				return *it;
 			}
-			// std::cout << "serv sock = " << (*it).getSock() << std::endl;
 		}
-		// std::cout << "lol\n";
 		return _servers[0];
 	}
 
@@ -273,14 +269,14 @@ private:
 
 	// Функция для получения времени создания файла в формате временной метки
 	std::string get_file_creation_date(const char* file_path) {
-    struct stat attr;
-    if (stat(file_path, &attr) != 0) {
-        return "Unknown";
-    }
-    char date_buff[80];
-    strftime(date_buff, sizeof(date_buff), "%Y-%m-%d %H:%M:%S", localtime(&attr.st_mtime));
-    return std::string(date_buff);
-}
+		struct stat attr;
+		if (stat(file_path, &attr) != 0) {
+			return "Unknown";
+		}
+		char date_buff[80];
+		strftime(date_buff, sizeof(date_buff), "%Y-%m-%d %H:%M:%S", localtime(&attr.st_mtime));
+		return std::string(date_buff);
+	}
 
 
 	// Функция для получения списка файлов и директорий в заданной директории

@@ -49,7 +49,7 @@ int main(int argc, char** argv, char** envp) {
     Server server2;
 
     server2._server_name.push_back("localhost");
-	server2._port = "2020";
+	server2._port = "4041";
     server2._conf._root = "/var/localhost/files";
     server2._conf._limit_except.methods["POST"] = false;
     server2._conf._limit_except.methods["DELETE"] = false;

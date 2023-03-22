@@ -55,7 +55,7 @@ char** vectorToCharArray(std::vector<std::string>& vec)
     char** charArray = new char*[vec.size() + 1];
 
     // Проходимся по каждой строке вектора и добавляем ее в массив указателей на символы
-    for (int i = 0; i < vec.size(); i++) {
+    for (size_t i = 0; i < vec.size(); i++) {
         charArray[i] = &vec[i][0];
     }
 
