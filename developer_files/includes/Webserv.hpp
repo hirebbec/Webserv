@@ -16,7 +16,7 @@
 void parseURI(std::vector<std::string>& envp, std::string& uri);
 char** vectorToCharArray(std::vector<std::string>& vec);
 
-#define BUFFER_SIZE 4096
+#define BUFFER_SIZE 165536
 
 class Webserv {
 private:
@@ -40,15 +40,19 @@ public:
 	}
 
 	bool init() {
+		int counter = 0;
 		for (std::vector<Server>::iterator it = _servers.begin(); it != _servers.end(); ++it) {
 			if ((*it).init()) {
 				_max_sock = _max_sock > (*it).getSock() ? _max_sock : (*it).getSock();
 				_listen_socks.insert((*it).getSock());
         		FD_SET((*it).getSock(), &_active_set);
+				counter++;
 			} else {
 				continue;
 			}
 		}
+		if (counter == 0)
+			return false;
 		return true;
 	}
 
@@ -101,11 +105,16 @@ private:
 
 	bool readRequest(int sock) {
 		char buf[BUFFER_SIZE];
-
+		int i = 0;
+		while (i < BUFFER_SIZE) {
+			buf[i] = 0;
+			i++;
+		}
 		int bytes = recv(sock, buf, BUFFER_SIZE, 0);
 
 		if (bytes < 0) {
 			std::cerr << "Error: Failed to receive data.\n";
+			delete_client(sock);
 			close(sock);
 			FD_CLR(sock, &_active_set);
 			return false;
@@ -114,7 +123,8 @@ private:
 			std::string response = httpResponse.generateResponse(204, std::vector<std::string>(), "/error_page/204.html");
 			if (send(sock, response.c_str(), response.length(), 0) <= 0) {
 				delete_client(sock);
-			} 
+			}
+			delete_client(sock);
 			close(sock);
 			FD_CLR(sock, &_active_set);
 			return false;
@@ -148,8 +158,8 @@ private:
 			headers.push_back(conf._return.second.getReturnPath()); // Location header
 		} else if (httpParser.method == "GET") { // case 2.3
 			if (httpParser.uri[httpParser.uri.length() - 1] == '/') { // case 2.3.1
-				if (exist(conf._root + httpParser.uri + conf._index)) { // case 2.3.1.1 (Checked)
-					std::string response = httpResponse.generateResponse(200, headers, conf._root + httpParser.uri + conf._index);
+				if (exist(conf._root + httpParser.uri +  conf._index)) { // case 2.3.1.1 (Checked)
+					std::string response = httpResponse.generateResponse(200, headers, conf._root + httpParser.uri +  conf._index);
 					if (send(sock, response.c_str(), response.length(), 0) <= 0) {
 						delete_client(sock);
 						FD_CLR(sock, &_active_set);
@@ -162,7 +172,7 @@ private:
 				} else { // case 2.3.1.3 (Checked)
 					code = 404; // Not Found
 				}
-			} else if (httpParser.uri.length() > 9 && httpParser.uri.substr(0, 9) == "/cgi-bin/") { // case 2.3.2 (Checked)
+			} else if (conf._root == "/cgi-bin") { // case 2.3.2 (Checked)
 				std::string uri = conf._root + httpParser.uri;
 				parseURI(_env, uri);
 				if (exist(uri)) {
@@ -172,10 +182,11 @@ private:
 					code = 404; // Not Found
 				}
 			} else {
-				if (exist(conf._root + httpParser.uri)) { // case 2.3.3 (Checked)
+				if (exist(conf._root + httpParser.uri) && !is_directory(conf._root + httpParser.uri)) { // case 2.3.3 (Checked)
 					code = 200; // successful response
-					path = conf._root + httpParser.uri; // File path 
-				} else {
+				} else if (is_directory(conf._root + httpParser.uri) && exist(conf._root + httpParser.uri + conf._index)) {
+					code = 200; // successful response
+				}else {
 					code = 404; // Not Found
 				}
 			}
@@ -226,10 +237,20 @@ private:
 
 	Configuration choseConf(Server &server) {
 		Configuration conf = server._conf;
-		std::string uri = httpParser.uri;
+		if (server._locations.empty()) {
+			if (httpParser.uri.empty()) {
+				httpParser.uri = "/";
+			}
+			return conf;
+		}
+		std::string uri = httpParser.uri[httpParser.uri.length() - 1] == '/' ? httpParser.uri : httpParser.uri + "/";
 
-		while (uri.length() > 0) {
+		while (uri.length() > 0 && uri != "/") {
 			if (server._locations.find(uri) != server._locations.end()) {
+				httpParser.uri = httpParser.uri.substr(uri.length() - 1, httpParser.uri.length());
+				if (httpParser.uri.empty()) {
+					httpParser.uri = "/";
+				}
 				return server._locations[uri]._conf;
 			}
 			if (uri[uri.length() - 1] == '/') {
@@ -242,6 +263,14 @@ private:
 				}
 			}
 		}
+
+		if (server._locations.find(uri) != server._locations.end()) {
+			httpParser.uri = httpParser.uri.substr(uri.length() - 1, httpParser.uri.length());
+			return server._locations[uri]._conf;
+		}
+		if (httpParser.uri.empty()) {
+			httpParser.uri = "/";
+		}
 		return conf;
 	}
 
@@ -253,10 +282,27 @@ private:
 		return ans;
 	}
 
+	bool is_directory(std::string path) {
+		path = "." + path;
+		struct stat buffer;
+
+		bool ans = false;
+		if (stat(path.c_str(), &buffer) == 0) {
+			if (S_ISREG(buffer.st_mode)) {
+				ans = false;
+			} else {
+				ans = true;
+			}
+		}
+		return ans;
+	}
+
 	std::string	getPath(int code, const Configuration &conf) {
 		if (code / 100 == 2) {
+			if (is_directory(conf._root + httpParser.uri))
+				return conf._root + httpParser.uri + conf._index;
 			return conf._root + httpParser.uri;
-		} 
+		}
 		if (conf._error_pages.find(code) != conf._error_pages.end()) {
 			return (*conf._error_pages.find(code)).second;
 		} else {

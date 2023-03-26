@@ -1,3 +1,5 @@
+#pragma once
+
 #include "Location.hpp"
 #include <netinet/in.h>
 #include <sys/types.h>
@@ -90,4 +92,21 @@ public:
 	}
 
 	Server() {};
+
+	bool	is_valid()
+	{
+		if (_port == "")
+		{
+			std::cerr << "Not found port in server" << std::endl;
+			return false;
+		}
+
+		if (_server_name.empty())
+		{
+			std::cerr << "Server name is missing" << std::endl;
+			return false;
+		}
+
+		return true;
+	}
 };

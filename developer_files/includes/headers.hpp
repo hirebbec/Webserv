@@ -1,4 +1,5 @@
 #include "Webserv.hpp"
+#include "ConfigParser.hpp"
 
 std::vector<std::string> getPathFromEnv(char **envp);
 std::vector<std::string> envpToVector(char** envp);

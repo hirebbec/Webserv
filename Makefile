@@ -1,18 +1,19 @@
 NAME		=	webserv
 
-CC			=	g++
-CFLAGS		=	-std=c++98 -Wall -Wextra -Werror
+CC			=	c++
+CFLAGS		=	-std=c++98 -Wall -Wextra -Werror# -fsanitize=address
 RM			=	rm -f
 
-SRCS		=	developer_files/srcs/main.cpp developer_files/srcs/utils.cpp
+SRCS		=	developer_files/srcs/main.cpp developer_files/srcs/utils.cpp developer_files/srcs/parser.cpp
 OBJS		=	$(SRCS:.cpp=.o)
+HEADERS     =   developer_files/includes/*.hpp
 
 $(NAME)		:	$(OBJS)
-				$(CC) -o $@ $^
+				$(CC) $(CFLAGS) -o $@ $^
 
 all			:	$(NAME)
 
-%.o			:	%.cpp
+%.o			:	%.cpp $(HEADERS)
 				$(CC) $(CFLAGS) -c -o $@ $<
 
 clean		:
